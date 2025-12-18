@@ -1,19 +1,33 @@
 <!doctype html>
 <html lang="de">
+
 <head>
-<meta charset="utf-8">
-<title>EPK → DIA (ohne Pfeile)</title>
-<style>
-  body { font-family: Arial, sans-serif; padding: 20px; }
-  textarea { width: 100%; height: 180px; font-family: monospace; }
-  button { padding: 8px 12px; margin-top: 10px; }
-</style>
+    <meta charset="utf-8">
+    <title>EPK → DIA (ohne Pfeile)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 180px;
+            font-family: monospace;
+        }
+
+        button {
+            padding: 8px 12px;
+            margin-top: 10px;
+        }
+    </style>
 </head>
+
 <body>
 
-<h2>EPK → DIA (ohne Verbindungslinien)</h2>
+    <h2>EPK → DIA (ohne Verbindungslinien)</h2>
 
-<textarea id="input">
+    <textarea id="input">
 E: Flugsteig ist erreicht
 F: Flug aufrufen
 E: Flug ist aufgerufen
@@ -24,25 +38,25 @@ F: Zugang zum Flugzeug gewähren
 E: Flugzeug ist bestiegen
 </textarea>
 
-<br>
-<button onclick="generate()">DIA-Datei erzeugen</button>
+    <br>
+    <button onclick="generate()">DIA-Datei erzeugen</button>
 
-<script>
-function diaHeader() {
-return `<?xml version="1.0" encoding="UTF-8"?>
+    <script>
+        function diaHeader() {
+            return `<?xml version="1.0" encoding="UTF-8"?>
 <dia:diagram xmlns:dia="http://www.lysator.liu.se/~alla/dia/">
   <dia:layer name="EPK" visible="true" active="true">`;
-}
+        }
 
-function diaFooter() {
-return `
+        function diaFooter() {
+            return `
   </dia:layer>
 </dia:diagram>`;
-}
+        }
 
-// Ereignis (Hexagon)
-function eventObj(id, text, x, y) {
-return `
+        // Ereignis (Hexagon)
+        function eventObj(id, text, x, y) {
+            return `
 <dia:object type="Flowchart - Preparation" version="1" id="${id}">
   <dia:attribute name="obj_pos"><dia:point val="${x},${y}"/></dia:attribute>
   <dia:attribute name="elem_corner"><dia:point val="${x},${y}"/></dia:attribute>
@@ -54,11 +68,11 @@ return `
     </dia:composite>
   </dia:attribute>
 </dia:object>`;
-}
+        }
 
-// Funktion
-function functionObj(id, text, x, y) {
-return `
+        // Funktion
+        function functionObj(id, text, x, y) {
+            return `
 <dia:object type="EDPC - Function" version="1" id="${id}">
   <dia:attribute name="obj_pos"><dia:point val="${x},${y}"/></dia:attribute>
   <dia:attribute name="elem_corner"><dia:point val="${x},${y}"/></dia:attribute>
@@ -70,16 +84,16 @@ return `
     </dia:composite>
   </dia:attribute>
 </dia:object>`;
-}
+        }
 
-// Konnektor
-function connectorObj(id, label, x, y) {
-  let type;
-  if (label === 'UND')  type = 'EDPC - And Operator';
-  if (label === 'ODER') type = 'EDPC - Or Operator';
-  if (label === 'XOR')  type = 'EDPC - XOR Operator';
+        // Konnektor
+        function connectorObj(id, label, x, y) {
+            let type;
+            if (label === 'UND') type = 'EDPC - And Operator';
+            if (label === 'ODER') type = 'EDPC - Or Operator';
+            if (label === 'XOR') type = 'EDPC - XOR Operator';
 
-  return `
+            return `
 <dia:object type="${type}" version="1" id="${id}">
   <dia:attribute name="obj_pos">
     <dia:point val="${x},${y}"/>
@@ -106,14 +120,14 @@ function connectorObj(id, label, x, y) {
     <dia:boolean val="true"/>
   </dia:attribute>
 </dia:object>`;
-}
+        }
 
 
 
 
-// ✅ Informationsobjekt (EPK-konform, wie DIA selbst)
-function infoObj(id, text, x, y) {
-return `
+        // ✅ Informationsobjekt (EPK-konform, wie DIA selbst)
+        function infoObj(id, text, x, y) {
+            return `
 <dia:object type="Flowchart - Predefined Process" version="1" id="${id}">
   <dia:attribute name="obj_pos"><dia:point val="${x},${y}"/></dia:attribute>
   <dia:attribute name="elem_corner"><dia:point val="${x},${y}"/></dia:attribute>
@@ -125,9 +139,30 @@ return `
     </dia:composite>
   </dia:attribute>
 </dia:object>`;
-}
+        }
 
-function generate() {
+        // Verbindung (Pfeil) zwischen zwei Objekten
+        function lineObj(id, from, to, points, fromConn, toConn) {
+            const ptsXml = points.map(p => `        <dia:point val="${p[0]},${p[1]}"/>`).join('\n');
+            return `
+<dia:object type="Standard - ZigZagLine" version="1" id="${id}">
+  <dia:attribute name="obj_pos"><dia:point val="${points[0][0]},${points[0][1]}"/></dia:attribute>
+  <dia:attribute name="orth_points">
+${ptsXml}
+  </dia:attribute>
+  <dia:attribute name="autorouting"><dia:boolean val="true"/></dia:attribute>
+  <dia:attribute name="end_arrow"><dia:enum val="22"/></dia:attribute>
+  <dia:attribute name="end_arrow_length"><dia:real val="0.5"/></dia:attribute>
+  <dia:attribute name="end_arrow_width"><dia:real val="0.5"/></dia:attribute>
+  <dia:connections>
+    <dia:connection handle="0" to="${from}" connection="${fromConn}"/>
+    <dia:connection handle="1" to="${to}" connection="${toConn}"/>
+  </dia:connections>
+</dia:object>`;
+        }
+
+
+       function generate() {
   const lines = document.getElementById('input').value
     .split('\n')
     .map(l => l.trim())
@@ -136,35 +171,79 @@ function generate() {
   let xml = diaHeader();
   let y = 5;
   let id = 1;
-  let lastFunctionY = null;
+
+  // Wir merken uns alle platzierten Objekte inkl. Geometrie
+  const placed = []; // { id, kind: 'E'|'F'|'K'|'I', x, y, w, h }
+
+  // Hilfsfunktion: Breite/Höhe passend zu deinen Objekten
+  function geomFor(kind) {
+    if (kind === 'E') return { w: 10, h: 4 };
+    if (kind === 'F') return { w: 9,  h: 3.5 };
+    if (kind === 'K') return { w: 2,  h: 2 };     // falls du später EDPC-Operatoren nutzt
+    if (kind === 'I') return { w: 6,  h: 3 };
+    return { w: 6, h: 3 };
+  }
 
   for (const line of lines) {
-    const [t, text] = line.split(':').map(s => s.trim());
+    const [tRaw, ...rest] = line.split(':');
+    const t = (tRaw || '').trim().toUpperCase();
+    const text = rest.join(':').trim();
     const oid = 'O' + (id++);
 
     if (t === 'E') {
       xml += eventObj(oid, text, 10, y);
-      y += 5;
+      const g = geomFor('E');
+      placed.push({ id: oid, kind: 'E', x: 10, y, w: g.w, h: g.h });
     }
-
     if (t === 'F') {
       xml += functionObj(oid, text, 25, y);
-      lastFunctionY = y;
-      y += 5;
+      const g = geomFor('F');
+      placed.push({ id: oid, kind: 'F', x: 25, y, w: g.w, h: g.h });
     }
-
-    if (t === 'I') {
-      if (lastFunctionY === null) {
-        alert('I: ohne vorherige Funktion ist nicht erlaubt');
-        return;
-      }
-      xml += infoObj(oid, text, 38, lastFunctionY);
-    }
-
     if (t === 'K') {
+      // (bei dir bisher nur als Text-Connector; Linien ignorieren wir beim "E/F in Reihenfolge"-Verbinden)
       xml += connectorObj(oid, text, 17, y);
-      y += 5;
+      const g = geomFor('K');
+      placed.push({ id: oid, kind: 'K', x: 17, y, w: g.w, h: g.h });
     }
+    if (t === 'I') {
+      xml += infoObj(oid, text, 38, y);
+      const g = geomFor('I');
+      placed.push({ id: oid, kind: 'I', x: 38, y, w: g.w, h: g.h });
+    }
+
+    y += 6;
+  }
+
+  // -------- Linien erzeugen: nur E/F in der Reihenfolge verbinden --------
+  const ef = placed.filter(p => p.kind === 'E' || p.kind === 'F');
+
+  // Connection-Mapping aus deinen echten DIA-Beispielen:
+  const connTop =  (kind) => (kind === 'E' ? 2 : kind === 'F' ? 0 : 0);
+  const connBottom=(kind) => (kind === 'E' ? 14: kind === 'F' ? 3 : 1);
+
+  for (let i = 0; i < ef.length - 1; i++) {
+    const a = ef[i];
+    const b = ef[i + 1];
+
+    const lid = 'O' + (id++);
+
+    // Punkte (orthogonal): unten Mitte von a -> (midY) -> oben Mitte von b
+    const ax = a.x + a.w / 2;
+    const ay = a.y + a.h;
+    const bx = b.x + b.w / 2;
+    const by = b.y;
+
+    const midY = (ay + by) / 2;
+
+    const points = [
+      [ax, ay],
+      [ax, midY],
+      [bx, midY],
+      [bx, by]
+    ];
+
+    xml += lineObj(lid, a.id, b.id, points, connBottom(a.kind), connTop(b.kind));
   }
 
   xml += diaFooter();
@@ -172,10 +251,12 @@ function generate() {
   const blob = new Blob([xml], { type: 'application/xml' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'epk-ohne-pfeile.dia';
+  a.download = 'epk-mit-pfeilen.dia';
   a.click();
 }
-</script>
+
+    </script>
 
 </body>
+
 </html>
