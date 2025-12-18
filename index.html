@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>EPK → DIA (ohne Pfeile)</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 20px; }
+  textarea { width: 100%; height: 180px; font-family: monospace; }
+  button { padding: 8px 12px; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<h2>EPK → DIA (ohne Verbindungslinien)</h2>
+
+<textarea id="input">
+E: Flugsteig ist erreicht
+F: Flug aufrufen
+E: Flug ist aufgerufen
+F: Bordkarte kontrollieren
+I: Bordkarte
+E: Bordkarte ist kontrolliert
+F: Zugang zum Flugzeug gewähren
+E: Flugzeug ist bestiegen
+</textarea>
+
+<br>
+<button onclick="generate()">DIA-Datei erzeugen</button>
+
+<script>
+function diaHeader() {
+return `<?xml version="1.0" encoding="UTF-8"?>
+<dia:diagram xmlns:dia="http://www.lysator.liu.se/~alla/dia/">
+  <dia:layer name="EPK" visible="true" active="true">`;
+}
+
+function diaFooter() {
+return `
+  </dia:layer>
+</dia:diagram>`;
+}
+
+// Ereignis (Hexagon)
+function eventObj(id, text, x, y) {
+return `
+<dia:object type="Flowchart - Preparation" version="1" id="${id}">
+  <dia:attribute name="obj_pos"><dia:point val="${x},${y}"/></dia:attribute>
+  <dia:attribute name="elem_corner"><dia:point val="${x},${y}"/></dia:attribute>
+  <dia:attribute name="elem_width"><dia:real val="10"/></dia:attribute>
+  <dia:attribute name="elem_height"><dia:real val="2"/></dia:attribute>
+  <dia:attribute name="text">
+    <dia:composite type="text">
+      <dia:attribute name="string"><dia:string>#${text}#</dia:string></dia:attribute>
+    </dia:composite>
+  </dia:attribute>
+</dia:object>`;
+}
+
+// Funktion
+function functionObj(id, text, x, y) {
+return `
+<dia:object type="EDPC - Function" version="1" id="${id}">
+  <dia:attribute name="obj_pos"><dia:point val="${x},${y}"/></dia:attribute>
+  <dia:attribute name="elem_corner"><dia:point val="${x},${y}"/></dia:attribute>
+  <dia:attribute name="elem_width"><dia:real val="9"/></dia:attribute>
+  <dia:attribute name="elem_height"><dia:real val="2.2"/></dia:attribute>
+  <dia:attribute name="text">
+    <dia:composite type="text">
+      <dia:attribute name="string"><dia:string>#${text}#</dia:string></dia:attribute>
+    </dia:composite>
+  </dia:attribute>
+</dia:object>`;
+}
+
+// Konnektor
+function connectorObj(id, label, x, y) {
+  let type;
+  if (label === 'UND')  type = 'EDPC - And Operator';
+  if (label === 'ODER') type = 'EDPC - Or Operator';
+  if (label === 'XOR')  type = 'EDPC - XOR Operator';
+
+  return `
+<dia:object type="${type}" version="1" id="${id}">
+  <dia:attribute name="obj_pos">
+    <dia:point val="${x},${y}"/>
+  </dia:attribute>
+  <dia:attribute name="elem_corner">
+    <dia:point val="${x},${y}"/>
+  </dia:attribute>
+  <dia:attribute name="elem_width">
+    <dia:real val="2"/>
+  </dia:attribute>
+  <dia:attribute name="elem_height">
+    <dia:real val="2"/>
+  </dia:attribute>
+  <dia:attribute name="line_width">
+    <dia:real val="0.1"/>
+  </dia:attribute>
+  <dia:attribute name="line_colour">
+    <dia:color val="#000000"/>
+  </dia:attribute>
+  <dia:attribute name="fill_colour">
+    <dia:color val="#ffffff"/>
+  </dia:attribute>
+  <dia:attribute name="show_background">
+    <dia:boolean val="true"/>
+  </dia:attribute>
+</dia:object>`;
+}
+
+
+
+
+// ✅ Informationsobjekt (EPK-konform, wie DIA selbst)
+function infoObj(id, text, x, y) {
+return `
+<dia:object type="Flowchart - Predefined Process" version="1" id="${id}">
+  <dia:attribute name="obj_pos"><dia:point val="${x},${y}"/></dia:attribute>
+  <dia:attribute name="elem_corner"><dia:point val="${x},${y}"/></dia:attribute>
+  <dia:attribute name="elem_width"><dia:real val="4"/></dia:attribute>
+  <dia:attribute name="elem_height"><dia:real val="2"/></dia:attribute>
+  <dia:attribute name="text">
+    <dia:composite type="text">
+      <dia:attribute name="string"><dia:string>#${text}#</dia:string></dia:attribute>
+    </dia:composite>
+  </dia:attribute>
+</dia:object>`;
+}
+
+function generate() {
+  const lines = document.getElementById('input').value
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l);
+
+  let xml = diaHeader();
+  let y = 5;
+  let id = 1;
+  let lastFunctionY = null;
+
+  for (const line of lines) {
+    const [t, text] = line.split(':').map(s => s.trim());
+    const oid = 'O' + (id++);
+
+    if (t === 'E') {
+      xml += eventObj(oid, text, 10, y);
+      y += 5;
+    }
+
+    if (t === 'F') {
+      xml += functionObj(oid, text, 25, y);
+      lastFunctionY = y;
+      y += 5;
+    }
+
+    if (t === 'I') {
+      if (lastFunctionY === null) {
+        alert('I: ohne vorherige Funktion ist nicht erlaubt');
+        return;
+      }
+      xml += infoObj(oid, text, 38, lastFunctionY);
+    }
+
+    if (t === 'K') {
+      xml += connectorObj(oid, text, 17, y);
+      y += 5;
+    }
+  }
+
+  xml += diaFooter();
+
+  const blob = new Blob([xml], { type: 'application/xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'epk-ohne-pfeile.dia';
+  a.click();
+}
+</script>
+
+</body>
+</html>
